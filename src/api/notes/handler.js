@@ -30,7 +30,8 @@ class NotesHandler {
     return response;
   }
 
-  async getNotesHandler() {
+  async getNotesHandler(request) {
+    const { id: userId } = request.auth.credentials;
     const notes = await this._service.getNotes();
     return {
       status: 'success',
