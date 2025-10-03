@@ -8,6 +8,7 @@ const Jwt = require('@hapi/jwt');
 const notes = require('./api/notes');
 const NotesService = require('./services/postgres/NotesService');
 const NotesValidator = require('./validator/notes');
+const ClientError = require('./exceptions/ClientError');
 
 // users
 const users = require('./api/users');
@@ -19,9 +20,6 @@ const authentications = require('./api/authentications');
 const AuthenticationsService = require('./services/postgres/AuthenticationsService');
 const TokenManager = require('./tokenize/TokenManager');
 const AuthenticationsValidator = require('./validator/authentications');
-
-// exceptions
-const ClientError = require('./exceptions/ClientError');
 
 const init = async () => {
   const notesService = new NotesService();
@@ -38,41 +36,6 @@ const init = async () => {
     },
   });
 
-  // Global error handler
-  server.ext('onPreResponse', (request, h) => {
-    const { response } = request;
-
-    if (response instanceof ClientError) {
-      const newResponse = h.response({
-        status: 'fail',
-        message: response.message,
-      });
-      newResponse.code(response.statusCode);
-      return newResponse;
-    }
-
-    if (response.isBoom) {
-      // Handle authentication errors (401) specifically
-      if (response.output && response.output.statusCode === 401) {
-        const newResponse = h.response({
-          status: 'fail',
-          message: 'Akses token tidak ditemukan atau tidak valid',
-        });
-        newResponse.code(401);
-        return newResponse;
-      }
-
-      const newResponse = h.response({
-        status: 'error',
-        message: 'Maaf, terjadi kegagalan pada server kami.',
-      });
-      newResponse.code(500);
-      return newResponse;
-    }
-
-    return h.continue;
-  });
-
   // registrasi plugin eksternal
   await server.register([
     {
@@ -82,7 +45,10 @@ const init = async () => {
 
   // mendefinisikan strategy autentikasi jwt
   server.auth.strategy('notesapp_jwt', 'jwt', {
-    keys: process.env.ACCESS_TOKEN_KEY,
+    keys: [{
+      key: process.env.ACCESS_TOKEN_KEY,
+      algorithms: ['HS256'],
+    }],
     verify: {
       aud: false,
       iss: false,
@@ -122,6 +88,23 @@ const init = async () => {
       },
     },
   ]);
+
+  server.ext('onPreResponse', (request, h) => {
+    // mendapatkan konteks response dari request
+    const { response } = request;
+
+    // penanganan client error secara internal.
+    if (response instanceof ClientError) {
+      const newResponse = h.response({
+        status: 'fail',
+        message: response.message,
+      });
+      newResponse.code(response.statusCode);
+      return newResponse;
+    }
+
+    return h.continue;
+  });
 
   await server.start();
   console.log(`Server berjalan pada ${server.info.uri}`);
