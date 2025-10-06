@@ -8,7 +8,7 @@ const { mapDBToModel } = require('../../utils');
 class NotesService {
   constructor(collaborationService) {
     this._pool = new Pool();
-    this._collaborationservice = collaborationService;
+    this._collaborationService = collaborationService;
   }
 
   async addNote({
@@ -35,9 +35,9 @@ class NotesService {
   async getNotes(owner) {
     const query = {
       text: `SELECT notes.* FROM notes
-      LEFT JOIN collaborations ON collaborations.note_id = notes.id
-      WHERE notes.owner = $1 OR collaborations.user_id = $1
-      GROUP BY notes.id`,
+    LEFT JOIN collaborations ON collaborations.note_id = notes.id
+    WHERE notes.owner = $1 OR collaborations.user_id = $1
+    GROUP BY notes.id`,
       values: [owner],
     };
     const result = await this._pool.query(query);
@@ -47,9 +47,9 @@ class NotesService {
   async getNoteById(id) {
     const query = {
       text: `SELECT notes.*, users.username
-      FROM notes
-      LEFT JOIN users ON users.id = notes.owner
-      WHERE notes.id = $1`,
+    FROM notes
+    LEFT JOIN users ON users.id = notes.owner
+    WHERE notes.id = $1`,
       values: [id],
     };
     const result = await this._pool.query(query);
@@ -111,11 +111,20 @@ class NotesService {
         throw error;
       }
       try {
-        await this._collaborationservice.verifyCollaborator(noteId, userId);
+        await this._collaborationService.verifyCollaborator(noteId, userId);
       } catch {
         throw error;
       }
     }
+  }
+
+  async getUsersByUsername(username) {
+    const query = {
+      text: 'SELECT id, username, fullname FROM users WHERE username LIKE $1',
+      values: [`%${username}%`],
+    };
+    const result = await this._pool.query(query);
+    return result.rows;
   }
 }
 
